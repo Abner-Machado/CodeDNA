@@ -112,7 +112,8 @@ Fronteiras honestas do MVP, não um roadmap disfarçado:
 - **A cobertura limita o veredito.** Método que aquela execução nunca alcança pontua 0%, importe ele
   ou não em outro caminho.
 - **O parser é um contador de chaves.** Chave dentro de string literal ou comentário confunde ele.
-- **Os mutantes rodam no mesmo processo.** Laço infinito trava a análise e `System.exit` encerra ela.
+- **Os mutantes rodam no mesmo processo.** Mutante que passa de 10 segundos (`-Dcodedna.timeout=N` para mudar)
+  conta como morto, mas a thread dele fica abandonada em vez de morta, e `System.exit` continua encerrando a análise inteira.
 
 ## Caminhos possíveis
 

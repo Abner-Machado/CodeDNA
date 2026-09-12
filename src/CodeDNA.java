@@ -13,6 +13,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -25,11 +27,18 @@ public class CodeDNA {
     static final Pattern SIGNATURE = Pattern.compile(
             "(?:public |private |protected |static |final )+([\\w.$<>\\[\\]]+)\\s+(\\w+)\\s*\\([^)]*\\)\\s*\\{");
 
+    /** A mutant that runs longer than this is treated as dead, so an infinite loop cannot hang the analysis. */
+    static final long TIMEOUT_SECONDS = Long.getLong("codedna.timeout", 10);
+
+    /** Where each mutant thread's System.out goes. A thread with no entry prints into the void. */
+    static final Map<Thread, OutputStream> SINKS = new ConcurrentHashMap<>();
+
     public static void main(String[] args) throws Exception {
         Path source = Path.of(args.length > 0 ? args[0] : "examples/Demo.java");
         String code = Files.readString(source);
         String name = source.getFileName().toString().replace(".java", "");
         Path work = Files.createTempDirectory("codedna");
+        System.setOut(new PrintStream(new Switchboard(), true, StandardCharsets.UTF_8));
 
         String healthy = run(code, name, work);
         Map<String, Double> dna = new LinkedHashMap<>();
@@ -63,23 +72,31 @@ public class CodeDNA {
         };
     }
 
-    /** Compiles this source and captures what its main() prints. Null means the program died. */
+    /** Compiles this source and captures what its main() prints. Null means the program died or hung. */
     static String run(String code, String name, Path work) throws Exception {
         Path file = work.resolve(name + ".java");
         Files.writeString(file, code);
         if (ToolProvider.getSystemJavaCompiler().run(null, null, OutputStream.nullOutputStream(),
                 "-d", work.toString(), file.toString()) != 0) return null;
 
-        PrintStream console = System.out;
         ByteArrayOutputStream captured = new ByteArrayOutputStream();
         try (URLClassLoader loader = new URLClassLoader(new URL[]{work.toUri().toURL()},
                 ClassLoader.getPlatformClassLoader())) {
-            System.setOut(new PrintStream(captured, true, StandardCharsets.UTF_8));
-            loader.loadClass(name).getMethod("main", String[].class).invoke(null, (Object) new String[0]);
-        } catch (ReflectiveOperationException died) {
-            return null;
-        } finally {
-            System.setOut(console);
+            var main = loader.loadClass(name).getMethod("main", String[].class);
+            boolean[] died = {false};
+            Thread runner = new Thread(() -> {
+                try {
+                    main.invoke(null, (Object) new String[0]);
+                } catch (ReflectiveOperationException e) {
+                    died[0] = true;
+                }
+            });
+            runner.setDaemon(true);
+            SINKS.put(runner, captured);
+            runner.start();
+            runner.join(TimeUnit.SECONDS.toMillis(TIMEOUT_SECONDS));
+            SINKS.remove(runner);
+            if (runner.isAlive() || died[0]) return null;
         }
         return captured.toString(StandardCharsets.UTF_8);
     }
@@ -92,6 +109,27 @@ public class CodeDNA {
         int kept = 0;
         for (String line : expected) if (actual.remove(line)) kept++;
         return expected.isEmpty() ? 0 : 1.0 - (double) kept / expected.size();
+    }
+
+    /** Routes System.out by thread: the analyser keeps the console, each mutant gets its own buffer. */
+    static class Switchboard extends OutputStream {
+        final OutputStream console = new FileOutputStream(FileDescriptor.out);
+        final Thread analyser = Thread.currentThread();
+
+        @Override
+        public void write(int b) throws java.io.IOException {
+            write(new byte[]{(byte) b}, 0, 1);
+        }
+
+        @Override
+        public void write(byte[] b, int off, int len) throws java.io.IOException {
+            Thread current = Thread.currentThread();
+            if (current == analyser) console.write(b, off, len);
+            else {
+                OutputStream sink = SINKS.get(current);
+                if (sink != null) sink.write(b, off, len);
+            }
+        }
     }
 
     static int bodyEnd(String code, int openingBrace) {
