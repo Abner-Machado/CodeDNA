@@ -1,0 +1,24 @@
+name: ci
+
+on: [push, pull_request]
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        java: [17, 21]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+      - run: javac -d build src/CodeDNA.java
+      # The demo is the whole contract: every method in Demo.java gets a score
+      # and parse() stays at 100%, since nothing works without it.
+      - run: |
+          java -cp build CodeDNA examples/Demo.java | tee out.txt
+          grep -q 'parse()' out.txt
+          grep -q '100%' out.txt
