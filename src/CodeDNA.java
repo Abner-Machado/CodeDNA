@@ -25,7 +25,8 @@ import java.util.regex.Pattern;
 public class CodeDNA {
 
     static final Pattern SIGNATURE = Pattern.compile(
-            "(?:public |private |protected |static |final )+([\\w.$<>\\[\\]]+)\\s+(\\w+)\\s*\\([^)]*\\)\\s*\\{");
+            "(?:public |private |protected |static |final )+([\\w.$<>\\[\\]]+)\\s+(\\w+)\\s*\\([^)]*\\)\\s*"
+                    + "(?:throws\\s+[\\w.$]+(?:\\s*,\\s*[\\w.$]+)*\\s*)?\\{");
 
     /** A mutant that runs longer than this is treated as dead, so an infinite loop cannot hang the analysis. */
     static final long TIMEOUT_SECONDS = Long.getLong("codedna.timeout", 10);
@@ -132,13 +133,35 @@ public class CodeDNA {
         }
     }
 
+    /** Index just past the brace that closes the body opened at {@code openingBrace}. */
     static int bodyEnd(String code, int openingBrace) {
         int depth = 0;
         for (int i = openingBrace; i < code.length(); i++) {
-            if (code.charAt(i) == '{') depth++;
-            else if (code.charAt(i) == '}' && --depth == 0) return i + 1;
+            char c = code.charAt(i);
+            // Braces inside literals and comments are text, not structure.
+            if (c == '"' || c == '\'') i = literalEnd(code, i);
+            else if (code.startsWith("//", i)) i = skipTo(code, "\n", i);
+            else if (code.startsWith("/*", i)) i = skipTo(code, "*/", i + 2) + 1;
+            else if (c == '{') depth++;
+            else if (c == '}' && --depth == 0) return i + 1;
         }
         return code.length();
+    }
+
+    /** Index of the quote that closes the string, text block or char literal opened at {@code start}. */
+    static int literalEnd(String code, int start) {
+        String close = code.startsWith("\"\"\"", start) ? "\"\"\"" : String.valueOf(code.charAt(start));
+        for (int i = start + close.length(); i < code.length(); i++) {
+            if (code.charAt(i) == '\\') i++;
+            else if (code.startsWith(close, i)) return i + close.length() - 1;
+        }
+        return code.length();
+    }
+
+    /** Index of the next {@code token} at or after {@code from}, or the end of the code if there is none. */
+    static int skipTo(String code, String token, int from) {
+        int at = code.indexOf(token, from);
+        return at < 0 ? code.length() : at;
     }
 
     static void chart(Map<String, Double> dna) {
