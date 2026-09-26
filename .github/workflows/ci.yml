@@ -23,8 +23,9 @@ jobs:
           grep -q 'parse()' out.txt
           grep -q '100%' out.txt
       # Tricky.java has braces inside strings, chars, comments and a text block, plus
-      # methods with throws clauses. Every method must show up, and none may score 100%.
+      # methods with throws clauses and two overloads of report. Every method must show up
+      # on its own line, and none may score 100%.
       - run: |
           java -cp build CodeDNA examples/Tricky.java | tee tricky.txt
-          for gene in brace risky block report; do grep -q "$gene()" tricky.txt; done
+          for gene in 'brace()' 'risky()' 'block()' 'report(String s)' 'report(int n)'; do grep -qF "$gene" tricky.txt; done
           ! grep -q '100%' tricky.txt

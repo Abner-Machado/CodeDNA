@@ -111,7 +111,9 @@ Fronteiras honestas do MVP, não um roadmap disfarçado:
   em vez de saída resolveria isso.
 - **A cobertura limita o veredito.** Método que aquela execução nunca alcança pontua 0%, importe ele
   ou não em outro caminho.
-- **O parser é um contador de chaves.** Chave dentro de string literal ou comentário confunde ele.
+- **O parser é um padrão, não uma gramática de Java.** Ele só acha o método quando a assinatura começa
+  com modificador (`static`, `public`...). Método sem modificador (`void run()`), método genérico
+  (`static <T> T id(T x)`) ou tipo de retorno com espaço (`Map<String, Integer>`) fica de fora.
 - **Os mutantes rodam no mesmo processo.** Mutante que passa de 10 segundos (`-Dcodedna.timeout=N` para mudar)
   conta como morto, mas a thread dele fica abandonada em vez de morta, e `System.exit` continua encerrando a análise inteira.
 

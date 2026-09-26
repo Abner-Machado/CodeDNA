@@ -112,7 +112,9 @@ These are honest boundaries of the MVP, not a roadmap in disguise:
   output would fix this.
 - **Coverage bounds the verdict.** A method that this particular run never reaches scores 0%,
   whether or not it matters elsewhere.
-- **The parser is a brace counter.** Braces inside string literals or comments confuse it.
+- **The parser is a pattern, not a Java grammar.** It finds a method only when the signature starts
+  with a modifier (`static`, `public`...). A package-private method (`void run()`), a generic method
+  (`static <T> T id(T x)`) or a return type with a space in it (`Map<String, Integer>`) is not seen.
 - **Mutants run in-process.** A mutant that runs longer than 10 seconds (`-Dcodedna.timeout=N` to change it)
   is scored as dead, but its thread is abandoned rather than killed, and `System.exit` still ends the whole analysis.
 

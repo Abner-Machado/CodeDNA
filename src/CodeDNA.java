@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
 public class CodeDNA {
 
     static final Pattern SIGNATURE = Pattern.compile(
-            "(?:public |private |protected |static |final )+([\\w.$<>\\[\\]]+)\\s+(\\w+)\\s*\\([^)]*\\)\\s*"
+            "(?:public |private |protected |static |final )+([\\w.$<>\\[\\]]+)\\s+(\\w+)\\s*\\(([^)]*)\\)\\s*"
                     + "(?:throws\\s+[\\w.$]+(?:\\s*,\\s*[\\w.$]+)*\\s*)?\\{");
 
     /** A mutant that runs longer than this is treated as dead, so an infinite loop cannot hang the analysis. */
@@ -52,12 +52,23 @@ public class CodeDNA {
     /** Every method of the file, paired with the source in which its body was removed. */
     static List<String[]> genes(String code) {
         List<String[]> genes = new ArrayList<>();
+        List<String> names = new ArrayList<>();
+        List<String> params = new ArrayList<>();
         Matcher m = SIGNATURE.matcher(code);
         while (m.find()) {
             if (m.group(2).equals("main")) continue;
             int bodyEnd = bodyEnd(code, m.end() - 1);
-            genes.add(new String[]{m.group(2) + "()",
+            names.add(m.group(2));
+            params.add(m.group(3).trim().replaceAll("\\s+", " "));
+            genes.add(new String[]{null,
                     code.substring(0, m.end()) + emptyBody(m.group(1)) + code.substring(bodyEnd)});
+        }
+        // Overloads share a name, so they are told apart by their parameters.
+        // Without this the second one overwrote the first in the report.
+        for (int i = 0; i < genes.size(); i++) {
+            String name = names.get(i);
+            boolean overloaded = names.indexOf(name) != names.lastIndexOf(name);
+            genes.get(i)[0] = name + "(" + (overloaded ? params.get(i) : "") + ")";
         }
         return genes;
     }

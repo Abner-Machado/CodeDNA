@@ -1,4 +1,4 @@
-/** Methods that used to fool the analyser: braces inside literals and comments, and throws clauses. */
+/** Methods that used to fool the analyser: braces inside literals and comments, throws clauses and overloads. */
 public class Tricky {
 
     static String brace(String s) {
@@ -23,10 +23,15 @@ public class Tricky {
         System.out.println("report " + s);
     }
 
+    static void report(int n) {
+        System.out.println("count " + n);
+    }
+
     public static void main(String[] args) throws Exception {
         System.out.println(brace("a"));
         System.out.println(risky("abc"));
         System.out.println(block("x"));
         report("done");
+        report(3);
     }
 }
