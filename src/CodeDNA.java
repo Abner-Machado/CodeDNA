@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
 public class CodeDNA {
 
     static final Pattern SIGNATURE = Pattern.compile(
-            "(?:public |private |protected |static |final )+([\\w.$<>\\[\\]]+)\\s+(\\w+)\\s*\\(([^)]*)\\)\\s*"
+            "(?:public |private |protected |static |final )+(?:<[^>]+>\\s+)?([\\w.$<>\\[\\]]+)\\s+(\\w+)\\s*\\(([^)]*)\\)\\s*"
                     + "(?:throws\\s+[\\w.$]+(?:\\s*,\\s*[\\w.$]+)*\\s*)?\\{");
 
     /** A mutant that runs longer than this is treated as dead, so an infinite loop cannot hang the analysis. */
